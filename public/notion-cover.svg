@@ -1,0 +1,17 @@
+<svg width="1800" height="600" viewBox="0 0 1800 600" fill="none" xmlns="http://www.w3.org/2000/svg">
+<rect width="1800" height="600" fill="#0B0D10"/>
+<defs>
+  <pattern id="grid" width="48" height="48" patternUnits="userSpaceOnUse">
+    <path d="M 48 0 L 0 0 0 48" fill="none" stroke="#27303A" stroke-width="1" opacity=".34"/>
+  </pattern>
+</defs>
+<rect width="1800" height="600" fill="url(#grid)"/>
+<g transform="translate(120 160)">
+  <rect x="0" y="0" width="180" height="62" rx="20" fill="#F4F6F8"/>
+  <rect x="0" y="86" width="132" height="62" rx="20" fill="#F4F6F8"/>
+  <rect x="0" y="172" width="62" height="62" rx="20" fill="#F4F6F8"/>
+</g>
+<text x="380" y="280" fill="#F4F6F8" font-family="Arial, Helvetica, sans-serif" font-size="92" font-weight="700">FieldOps Studio</text>
+<text x="384" y="355" fill="#98A3AF" font-family="Arial, Helvetica, sans-serif" font-size="34">Contractor Operations OS</text>
+<text x="384" y="418" fill="#66717E" font-family="Arial, Helvetica, sans-serif" font-size="25">Projects · Field Operations · Procurement · Costs · Closeout</text>
+</svg>
