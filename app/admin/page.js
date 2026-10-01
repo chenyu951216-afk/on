@@ -43,8 +43,8 @@ export default function AdminPage(){
     if(!r.ok){
       if(mode==="setup"&&r.status===409){
         setPassword("");
-        await checkAuth();
-        setAuthError("管理員已建立，請使用剛剛設定的密碼登入。");
+        setAuth({loading:false,initialized:true,authenticated:false});
+        setAuthError("管理員已建立，請輸入剛剛設定的密碼登入。");
         return;
       }
       setAuthError(d.error||"操作失敗");
