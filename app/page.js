@@ -1,1 +1,61 @@
-"use client";import{useEffect,useState}from"react";const empty={siteName:"FieldOps Studio",ownerEmail:"",notionStoreUrl:"",notionCreatorUrl:"",notionWebhookSecret:"",openaiApiKey:"",hasOpenaiApiKey:false,discordWebhookUrl:"",timezone:"Asia/Taipei",currency:"TWD",notes:"",aiEnabled:"false",aiModel:"gpt-6-luna",aiMonthlyBudgetUsd:"5",aiCustomerSupport:"true",aiSalesAnalysis:"true",aiFeedbackAnalysis:"true",aiAnomalyTriage:"true"};export default function Home(){const[form,setForm]=useState(empty);const[saved,setSaved]=useState(false);useEffect(()=>{fetch("/api/settings").then(r=>r.json()).then(d=>setForm({...empty,...d}))},[]);function set(k,v){setForm(x=>({...x,[k]:v}))}async function save(){setSaved(false);const r=await fetch("/api/settings",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(form)});if(r.ok)setSaved(true)}return <main className="container"><div className="topbar"><div className="brand"><div className="logo">F</div><div><h1>FieldOps Studio Hub</h1><div className="sub">Notion 商品、收益與自動化控制中心</div></div></div><span className="badge">基礎版</span></div><div className="nav"><a className="active" href="#dashboard">總覽</a><a href="#settings">設定</a><a href="#automation">自動化</a></div><section id="dashboard" className="grid"><div className="card kpi"><div className="label">本月收入</div><div className="value">NT$0</div></div><div className="card kpi"><div className="label">本月訂單</div><div className="value">0</div></div><div className="card kpi"><div className="label">待處理事項</div><div className="value">0</div></div><div className="card kpi"><div className="label">自動化狀態</div><div className="value">Ready</div></div><div className="card span6"><h2>目前產品</h2><div className="row"><div><strong>Contractor Operations OS</strong><div className="note">主產品 · 建置中</div></div><span className="badge">US$79–99</span></div><div className="row"><div><strong>Creator Profile</strong><div className="note">Marketplace 申請中</div></div><span className="badge">Notion</span></div></div><div className="card span6" id="automation"><h2>自動化規劃</h2><div className="row"><span>Notion Marketplace Webhook</span><span className="badge">待串接</span></div><div className="row"><span>訂單 / 退款紀錄</span><span className="badge">已預留</span></div><div className="row"><span>GPT 摘要 / 客服分類</span><span className="badge">已預留</span></div><div className="row"><span>Discord 異常通知</span><span className="badge">已預留</span></div></div><div className="card span12" id="settings"><h2>網頁設定</h2><p className="note">業務設定都從這裡填寫，不要求你進 Zeabur 後台維護環境變數。正式填敏感金鑰前會再加入登入與加密。</p><div className="form"><div className="field"><label>品牌名稱</label><input value={form.siteName} onChange={e=>set("siteName",e.target.value)}/></div><div className="field"><label>管理 Email</label><input value={form.ownerEmail} onChange={e=>set("ownerEmail",e.target.value)}/></div><div className="field full"><label>Notion Marketplace / 商品網址</label><input value={form.notionStoreUrl} onChange={e=>set("notionStoreUrl",e.target.value)}/></div><div className="field full"><label>Notion Creator Profile 網址</label><input value={form.notionCreatorUrl} onChange={e=>set("notionCreatorUrl",e.target.value)}/></div><div className="field"><label>時區</label><input value={form.timezone} onChange={e=>set("timezone",e.target.value)}/></div><div className="field"><label>主要幣別</label><input value={form.currency} onChange={e=>set("currency",e.target.value)}/></div><div className="field full"><label>Notion Webhook Secret</label><input type="password" value={form.notionWebhookSecret} onChange={e=>set("notionWebhookSecret",e.target.value)}/></div><div className="field full"><h2>OpenAI / GPT 自動化（選用）</h2><div className="note">總開關關閉時不會呼叫 OpenAI API，也不會產生模型用量。</div></div><div className="field"><label>AI 總開關</label><select value={form.aiEnabled} onChange={e=>set("aiEnabled",e.target.value)}><option value="false">關閉（零 API 用量）</option><option value="true">開啟</option></select></div><div className="field"><label>模型</label><select value={form.aiModel} onChange={e=>set("aiModel",e.target.value)} disabled={form.aiEnabled!=="true"}><option value="gpt-6-luna">GPT-6 Luna（低成本，建議）</option><option value="gpt-6-sol">GPT-6 Sol（較高能力）</option><option value="gpt-5.6-luna">GPT-5.6 Luna</option></select></div><div className="field"><label>每月 AI 預算警戒值（USD）</label><input type="number" min="0" value={form.aiMonthlyBudgetUsd} onChange={e=>set("aiMonthlyBudgetUsd",e.target.value)} disabled={form.aiEnabled!=="true"}/></div><div className="field"><label>客服自動化</label><select value={form.aiCustomerSupport} onChange={e=>set("aiCustomerSupport",e.target.value)} disabled={form.aiEnabled!=="true"}><option value="true">開</option><option value="false">關</option></select></div><div className="field"><label>銷售分析</label><select value={form.aiSalesAnalysis} onChange={e=>set("aiSalesAnalysis",e.target.value)} disabled={form.aiEnabled!=="true"}><option value="true">開</option><option value="false">關</option></select></div><div className="field"><label>買家回饋整理</label><select value={form.aiFeedbackAnalysis} onChange={e=>set("aiFeedbackAnalysis",e.target.value)} disabled={form.aiEnabled!=="true"}><option value="true">開</option><option value="false">關</option></select></div><div className="field"><label>異常事件判斷</label><select value={form.aiAnomalyTriage} onChange={e=>set("aiAnomalyTriage",e.target.value)} disabled={form.aiEnabled!=="true"}><option value="true">開</option><option value="false">關</option></select></div><div className="field full"><label>OpenAI API Key {form.hasOpenaiApiKey?"（已儲存；留空不覆蓋）":""}</label><input type="password" value={form.openaiApiKey} onChange={e=>set("openaiApiKey",e.target.value)} placeholder={form.hasOpenaiApiKey?"•••••••• 已儲存":"需要 AI 時再填"} disabled={form.aiEnabled!=="true"}/></div><div className="field full"><label>Discord Webhook URL</label><input type="password" value={form.discordWebhookUrl} onChange={e=>set("discordWebhookUrl",e.target.value)}/></div><div className="field full"><label>備註</label><textarea value={form.notes} onChange={e=>set("notes",e.target.value)}/></div><div className="field full"><button onClick={save}>{saved?"已儲存":"儲存設定"}</button></div></div></div></section></main>}
+export default function Home(){
+  return <main className="site">
+    <header className="siteNav">
+      <a className="siteBrand" href="/">
+        <img src="/fieldops-logo.svg" alt="" className="siteLogo"/>
+        <span>FieldOps Studio</span>
+      </a>
+      <span className="sitePill">Contractor Operations OS · Coming Soon</span>
+    </header>
+
+    <section className="hero">
+      <div className="heroGrid"></div>
+      <div className="heroInner">
+        <div className="eyebrow">NOTION SYSTEMS FOR REAL OPERATIONS</div>
+        <h1>Run field operations<br/>with less admin.</h1>
+        <p className="heroCopy">FieldOps Studio builds practical Notion systems for contractors and service businesses—designed to keep projects, people, materials, documents, and day-to-day work organized in one place.</p>
+        <div className="heroActions">
+          <a className="primaryCta" href="#product">See what we’re building</a>
+          <span className="quiet">Marketplace launch in progress</span>
+        </div>
+      </div>
+    </section>
+
+    <section className="section" id="product">
+      <div className="sectionKicker">FIRST PRODUCT</div>
+      <div className="sectionTitleRow">
+        <div>
+          <h2>Contractor Operations OS</h2>
+          <p>A complete Notion workspace built around the way small contractors and field-service teams actually work.</p>
+        </div>
+        <span className="statusPill">In development</span>
+      </div>
+
+      <div className="featureGrid">
+        <article><span>01</span><h3>Projects & job sites</h3><p>Keep active jobs, timelines, owners, documents, and next actions connected.</p></article>
+        <article><span>02</span><h3>Clients & leads</h3><p>Track opportunities from first contact through quote, approval, and completed work.</p></article>
+        <article><span>03</span><h3>Tasks & schedules</h3><p>Give field work and office follow-up one shared operational view.</p></article>
+        <article><span>04</span><h3>Materials & purchasing</h3><p>Organize material needs, purchase status, and job-level records without spreadsheet sprawl.</p></article>
+        <article><span>05</span><h3>Subcontractors</h3><p>Keep partner details, assignments, documents, and project relationships in one system.</p></article>
+        <article><span>06</span><h3>Daily operations</h3><p>Daily site logs, issues, change orders, punch lists, expenses, and follow-up in one workflow.</p></article>
+      </div>
+    </section>
+
+    <section className="section principles">
+      <div className="sectionKicker">OUR APPROACH</div>
+      <div className="principleGrid">
+        <div><strong>Simple systems.</strong><p>Useful structure without turning a small business into a software project.</p></div>
+        <div><strong>Clear workflows.</strong><p>Every database and view should answer a real operational question.</p></div>
+        <div><strong>Less administrative work.</strong><p>Built to reduce duplicate tracking and make the next action obvious.</p></div>
+      </div>
+    </section>
+
+    <footer className="siteFooter">
+      <div className="siteBrand">
+        <img src="/fieldops-logo.svg" alt="" className="siteLogo"/>
+        <span>FieldOps Studio</span>
+      </div>
+      <p>Practical Notion systems for contractors and service businesses.</p>
+    </footer>
+  </main>
+}
