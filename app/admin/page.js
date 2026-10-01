@@ -40,7 +40,16 @@ export default function AdminPage(){
       method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({password})
     });
     const d=await r.json();
-    if(!r.ok){setAuthError(d.error||"操作失敗");return}
+    if(!r.ok){
+      if(mode==="setup"&&r.status===409){
+        setPassword("");
+        await checkAuth();
+        setAuthError("管理員已建立，請使用剛剛設定的密碼登入。");
+        return;
+      }
+      setAuthError(d.error||"操作失敗");
+      return;
+    }
     setPassword("");
     await checkAuth();
   }
