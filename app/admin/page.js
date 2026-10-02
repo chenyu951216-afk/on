@@ -1,172 +1,51 @@
 "use client";
 import{useEffect,useState}from"react";
 
-const empty={
-  siteName:"FieldOps Studio",ownerEmail:"",notionStoreUrl:"",notionCreatorUrl:"",
-  notionWebhookSecret:"",openaiApiKey:"",discordWebhookUrl:"",
-  hasOpenaiApiKey:false,hasNotionWebhookSecret:false,hasDiscordWebhookUrl:false,
-  timezone:"Asia/Taipei",currency:"TWD",notes:"",
-  aiEnabled:"false",aiModel:"gpt-5.6-luna",aiMonthlyBudgetUsd:"5",
-  aiCustomerSupport:"true",aiSalesAnalysis:"true",aiFeedbackAnalysis:"true",aiAnomalyTriage:"true"
-};
+const empty={siteName:"FieldOps Studio",ownerEmail:"",notionStoreUrl:"",notionCreatorUrl:"",notionWebhookSecret:"",openaiApiKey:"",discordWebhookUrl:"",hasOpenaiApiKey:false,hasNotionWebhookSecret:false,hasDiscordWebhookUrl:false,timezone:"Asia/Taipei",currency:"USD",notes:"",aiEnabled:"false",aiModel:"gpt-5.6-luna",aiMonthlyBudgetUsd:"5",aiBudgetMode:"hard_stop",aiInputCostPerMillion:"0.25",aiOutputCostPerMillion:"2",aiCustomerSupport:"true",aiSalesAnalysis:"true",aiFeedbackAnalysis:"true",aiAnomalyTriage:"true",defaultProductPriceUsd:"79",refundAlertPercent:"10",notificationsEnabled:"false"};
+const blankData={metrics:{grossCents:0,refundCents:0,netCents:0,orderCount:0,openCases:0,openAlerts:0,aiSpendUsd:0},orders:[],refunds:[],supportCases:[],alerts:[],aiUsage:[],events:[]};
+const money=cents=>new Intl.NumberFormat("en-US",{style:"currency",currency:"USD"}).format((Number(cents)||0)/100);
+const date=value=>value?new Date(value.endsWith?.("Z")?value:value+"Z").toLocaleString("zh-TW",{dateStyle:"medium",timeStyle:"short"}):"—";
 
 export default function AdminPage(){
-  const[auth,setAuth]=useState({loading:true,initialized:false,authenticated:false});
-  const[password,setPassword]=useState("");
-  const[authError,setAuthError]=useState("");
-  const[form,setForm]=useState(empty);
-  const[saved,setSaved]=useState(false);
-  const[testResult,setTestResult]=useState("");
-
+  const[auth,setAuth]=useState({loading:true,initialized:false,authenticated:false}),[password,setPassword]=useState(""),[authError,setAuthError]=useState("");
+  const[form,setForm]=useState(empty),[data,setData]=useState(blankData),[notice,setNotice]=useState(""),[analysis,setAnalysis]=useState("");
+  const[order,setOrder]=useState({external_id:"",buyer_name:"",buyer_email:"",amount:"79",status:"paid"});
+  const[refund,setRefund]=useState({order_id:"",external_id:"",amount:"79",reason:""});
+  const[support,setSupport]=useState({subject:"",customer_email:"",category:"general",priority:"normal",summary:""});
   useEffect(()=>{checkAuth()},[]);
-
-  async function checkAuth(){
-    const r=await fetch("/api/auth/status",{cache:"no-store"});
-    const d=await r.json();
-    setAuth({loading:false,...d});
-    if(d.authenticated)await loadSettings();
-  }
-
-  async function loadSettings(){
-    const r=await fetch("/api/settings",{cache:"no-store"});
-    if(r.status===401){setAuth(x=>({...x,authenticated:false}));return}
-    const d=await r.json();
-    setForm({...empty,...d});
-  }
-
-  async function submitAuth(mode){
-    setAuthError("");
-    const r=await fetch(mode==="setup"?"/api/auth/setup":"/api/auth/login",{
-      method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({password})
-    });
-    const d=await r.json();
-    if(!r.ok){
-      if(mode==="setup"&&r.status===409){
-        setPassword("");
-        setAuth({loading:false,initialized:true,authenticated:false});
-        setAuthError("管理員已建立，請輸入剛剛設定的密碼登入。");
-        return;
-      }
-      setAuthError(d.error||"操作失敗");
-      return;
-    }
-    setPassword("");
-    await checkAuth();
-  }
-
-  async function logout(){
-    await fetch("/api/auth/logout",{method:"POST"});
-    setForm(empty);
-    await checkAuth();
-  }
-
+  async function checkAuth(){const r=await fetch("/api/auth/status",{cache:"no-store"}),d=await r.json();setAuth({loading:false,...d});if(d.authenticated)await Promise.all([loadSettings(),loadDashboard()])}
+  async function loadSettings(){const r=await fetch("/api/settings",{cache:"no-store"});if(r.status===401)return setAuth(x=>({...x,authenticated:false}));setForm({...empty,...await r.json()})}
+  async function loadDashboard(){const r=await fetch("/api/dashboard",{cache:"no-store"});if(r.ok)setData(await r.json())}
+  async function submitAuth(mode){setAuthError("");const r=await fetch(mode==="setup"?"/api/auth/setup":"/api/auth/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({password})}),d=await r.json();if(!r.ok){if(mode==="setup"&&r.status===409){setPassword("");setAuth({loading:false,initialized:true,authenticated:false});return setAuthError("管理員已建立，請用剛設定的密碼登入。")}return setAuthError(d.error||"操作失敗")}setPassword("");await checkAuth()}
+  async function logout(){await fetch("/api/auth/logout",{method:"POST"});setForm(empty);await checkAuth()}
   function set(k,v){setForm(x=>({...x,[k]:v}))}
-
-  async function save(){
-    setSaved(false);
-    const r=await fetch("/api/settings",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(form)});
-    if(r.status===401){setAuth(x=>({...x,authenticated:false}));return false}
-    const d=await r.json();
-    if(r.ok){
-      setSaved(true);
-      setForm(x=>({...x,openaiApiKey:"",notionWebhookSecret:"",discordWebhookUrl:"",
-        hasOpenaiApiKey:d.hasOpenaiApiKey,hasNotionWebhookSecret:d.hasNotionWebhookSecret,hasDiscordWebhookUrl:d.hasDiscordWebhookUrl
-      }));
-      return true;
-    }
-    return false;
-  }
-
-  async function testAI(){
-    setTestResult("測試中…");
-    const ok=await save();
-    if(!ok){setTestResult("✕ 儲存失敗");return}
-    const r=await fetch("/api/ai/test",{method:"POST"});
-    const d=await r.json();
-    setTestResult(r.ok?"✓ "+d.message:"✕ "+(d.error||"測試失敗"));
-  }
-
-  if(auth.loading){
-    return <main className="authShell"><div className="authCard"><h1>FieldOps Studio</h1><p className="note">正在檢查管理員狀態…</p></div></main>;
-  }
-
-  if(!auth.authenticated){
-    const first=!auth.initialized;
-    return <main className="authShell">
-      <div className="authCard">
-        <div className="brand"><img src="/fieldops-logo.svg" className="siteLogo" alt=""/><div><h1>FieldOps Studio</h1><div className="sub">Private Admin</div></div></div>
-        <div className="authDivider"/>
-        <h2>{first?"第一次設定管理後台":"管理員登入"}</h2>
-        <p className="note">{first?"建立至少 10 個字元的管理員密碼。密碼只儲存安全雜湊，不會以明文保存。":"這裡不是顧客頁面。輸入管理員密碼才能進入控制台。"}</p>
-        <label>{first?"建立管理員密碼":"管理員密碼"}</label>
-        <input type="password" value={password} onChange={e=>setPassword(e.target.value)}
-          onKeyDown={e=>{if(e.key==="Enter")submitAuth(first?"setup":"login")}}
-          placeholder={first?"至少 10 個字元":"輸入密碼"} autoFocus/>
-        {authError&&<div className="authError">{authError}</div>}
-        <button onClick={()=>submitAuth(first?"setup":"login")}>{first?"建立並進入後台":"登入"}</button>
-        <a className="backLink" href="/">← 回 FieldOps Studio 官網</a>
-      </div>
-    </main>;
-  }
-
+  async function save(){setNotice("儲存中…");const r=await fetch("/api/settings",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(form)}),d=await r.json();if(!r.ok)return setNotice(d.error||"儲存失敗");setForm(x=>({...x,openaiApiKey:"",notionWebhookSecret:"",discordWebhookUrl:"",...d}));setNotice("✓ 設定已儲存")}
+  async function addRecord(kind,payload,reset){setNotice("儲存中…");const r=await fetch("/api/records",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({kind,...payload})}),d=await r.json();if(!r.ok)return setNotice(d.error||"儲存失敗");reset?.();await loadDashboard();setNotice("✓ 記錄已加入")}
+  async function runAI(kind){setAnalysis("分析中…");const r=await fetch("/api/ai/analyze",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({kind})}),d=await r.json();setAnalysis(r.ok?d.output:"✕ "+(d.error||"分析失敗"));await loadDashboard()}
+  async function test(path){setNotice("測試中…");const r=await fetch(path,{method:"POST"}),d=await r.json();setNotice(r.ok?"✓ "+d.message:"✕ "+(d.error||"測試失敗"));await loadDashboard()}
+  if(auth.loading)return <main className="authShell"><div className="authCard"><h1>FieldOps Studio</h1><p className="note">正在檢查管理員狀態…</p></div></main>;
+  if(!auth.authenticated){const first=!auth.initialized;return <main className="authShell"><div className="authCard"><div className="brand"><img src="/fieldops-logo.svg" className="siteLogo" alt=""/><div><h1>FieldOps Studio</h1><div className="sub">Private Admin</div></div></div><div className="authDivider"/><h2>{first?"第一次設定管理後台":"管理員登入"}</h2><p className="note">{first?"建立至少 10 個字元的管理員密碼。":"輸入管理員密碼才能進入控制台。"}</p><label>{first?"建立管理員密碼":"管理員密碼"}</label><input type="password" value={password} onChange={e=>setPassword(e.target.value)} onKeyDown={e=>e.key==="Enter"&&submitAuth(first?"setup":"login")} autoFocus/>{authError&&<div className="authError">{authError}</div>}<button onClick={()=>submitAuth(first?"setup":"login")}>{first?"建立並進入後台":"登入"}</button><a className="backLink" href="/">← 回官網</a></div></main>}
   return <main className="container adminOnly">
-    <div className="topbar">
-      <div className="brand"><img src="/fieldops-logo.svg" className="siteLogo" alt=""/><div><h1>FieldOps Studio Hub</h1><div className="sub">私人管理後台 · 顧客不會看到這一頁</div></div></div>
-      <div className="topActions"><a className="badge" href="/">查看公開官網</a><button className="smallButton" onClick={logout}>登出</button></div>
-    </div>
-
-    <div className="nav"><a className="active" href="#dashboard">總覽</a><a href="#settings">設定</a><a href="#automation">AI 自動化</a></div>
-
+    <div className="topbar"><div className="brand"><img src="/fieldops-logo.svg" className="siteLogo" alt=""/><div><h1>FieldOps Studio Hub</h1><div className="sub">收入、客服與自動化例外控制台</div></div></div><div className="topActions"><span className="badge live">資料即時</span><a className="badge" href="/">公開官網</a><button className="smallButton" onClick={logout}>登出</button></div></div>
+    <div className="nav"><a href="#dashboard">總覽</a><a href="#commerce">交易</a><a href="#support">客服</a><a href="#automation">AI 與通知</a><a href="#settings">設定</a></div>{notice&&<div className="notice">{notice}</div>}
     <section id="dashboard" className="grid">
-      <div className="card kpi"><div className="label">本月收入</div><div className="value">NT$0</div></div>
-      <div className="card kpi"><div className="label">本月訂單</div><div className="value">0</div></div>
-      <div className="card kpi"><div className="label">待處理事項</div><div className="value">0</div></div>
-      <div className="card kpi"><div className="label">AI 自動化</div><div className="value">{form.aiEnabled==="true"?"ON":"OFF"}</div></div>
-
-      <div className="card span6">
-        <h2>目前產品</h2>
-        <div className="row"><div><strong>Contractor Operations OS</strong><div className="note">主產品 · 建置中</div></div><span className="badge">US$79–99</span></div>
-        <div className="row"><div><strong>Notion Marketplace</strong><div className="note">Creator / 販售資格申請流程</div></div><span className="badge">進行中</span></div>
-      </div>
-
-      <div className="card span6">
-        <h2>自動化狀態</h2>
-        <div className="row"><span>Notion Marketplace Webhook</span><span className="badge">{form.hasNotionWebhookSecret?"已設定":"尚未設定"}</span></div>
-        <div className="row"><span>OpenAI</span><span className="badge">{form.aiEnabled==="true"?"已開啟":"已關閉"}</span></div>
-        <div className="row"><span>Discord 通知</span><span className="badge">{form.hasDiscordWebhookUrl?"已設定":"尚未設定"}</span></div>
-      </div>
-
-      <div className="card span12" id="settings">
-        <h2>一般設定</h2>
-        <p className="note">這些資料都從網頁管理。敏感欄位會加密保存；留空再儲存不會清除已存在的值。</p>
-        <div className="form">
-          <div className="field"><label>品牌名稱</label><input value={form.siteName} onChange={e=>set("siteName",e.target.value)}/></div>
-          <div className="field"><label>管理 Email</label><input value={form.ownerEmail} onChange={e=>set("ownerEmail",e.target.value)}/></div>
-          <div className="field full"><label>Notion Marketplace / 商品網址</label><input value={form.notionStoreUrl} onChange={e=>set("notionStoreUrl",e.target.value)} placeholder="正式上架後再填"/></div>
-          <div className="field full"><label>Notion Creator Profile 網址</label><input value={form.notionCreatorUrl} onChange={e=>set("notionCreatorUrl",e.target.value)} placeholder="有公開 Creator URL 後再填"/></div>
-          <div className="field"><label>時區</label><input value={form.timezone} onChange={e=>set("timezone",e.target.value)}/></div>
-          <div className="field"><label>主要幣別</label><input value={form.currency} onChange={e=>set("currency",e.target.value)}/></div>
-          <div className="field full"><label>Notion Webhook Secret {form.hasNotionWebhookSecret?"（已設定）":""}</label><input type="password" value={form.notionWebhookSecret} onChange={e=>set("notionWebhookSecret",e.target.value)} placeholder={form.hasNotionWebhookSecret?"•••••••• 留空保留原值":"之後串接 Marketplace 時再填"}/></div>
-          <div className="field full"><label>Discord Webhook URL {form.hasDiscordWebhookUrl?"（已設定）":""}</label><input type="password" value={form.discordWebhookUrl} onChange={e=>set("discordWebhookUrl",e.target.value)} placeholder={form.hasDiscordWebhookUrl?"•••••••• 留空保留原值":"選用"}/></div>
-          <div className="field full"><label>備註</label><textarea value={form.notes} onChange={e=>set("notes",e.target.value)}/></div>
-        </div>
-      </div>
-
-      <div className="card span12" id="automation">
-        <h2>OpenAI / GPT 自動化（選用）</h2>
-        <p className="note">總開關關閉時，不會呼叫 OpenAI API，也不會產生模型用量。</p>
-        <div className="form">
-          <div className="field"><label>AI 總開關</label><select value={form.aiEnabled} onChange={e=>set("aiEnabled",e.target.value)}><option value="false">關閉（零 API 用量）</option><option value="true">開啟</option></select></div>
-          <div className="field"><label>模型</label><select value={form.aiModel} onChange={e=>set("aiModel",e.target.value)} disabled={form.aiEnabled!=="true"}><option value="gpt-5.6-luna">GPT-5.6 Luna（低成本）</option><option value="gpt-5.6-terra">GPT-5.6 Terra（平衡）</option><option value="gpt-5.6-sol">GPT-5.6 Sol（高能力）</option></select></div>
-          <div className="field"><label>每月 AI 預算警戒值（USD）</label><input type="number" min="0" step="1" value={form.aiMonthlyBudgetUsd} onChange={e=>set("aiMonthlyBudgetUsd",e.target.value)} disabled={form.aiEnabled!=="true"}/></div>
-          <div className="field"><label>客服自動化</label><select value={form.aiCustomerSupport} onChange={e=>set("aiCustomerSupport",e.target.value)} disabled={form.aiEnabled!=="true"}><option value="true">開</option><option value="false">關</option></select></div>
-          <div className="field"><label>銷售分析</label><select value={form.aiSalesAnalysis} onChange={e=>set("aiSalesAnalysis",e.target.value)} disabled={form.aiEnabled!=="true"}><option value="true">開</option><option value="false">關</option></select></div>
-          <div className="field"><label>買家回饋整理</label><select value={form.aiFeedbackAnalysis} onChange={e=>set("aiFeedbackAnalysis",e.target.value)} disabled={form.aiEnabled!=="true"}><option value="true">開</option><option value="false">關</option></select></div>
-          <div className="field"><label>異常事件判斷</label><select value={form.aiAnomalyTriage} onChange={e=>set("aiAnomalyTriage",e.target.value)} disabled={form.aiEnabled!=="true"}><option value="true">開</option><option value="false">關</option></select></div>
-          <div className="field full"><label>OpenAI API Key {form.hasOpenaiApiKey?"（已設定）":""}</label><input type="password" value={form.openaiApiKey} onChange={e=>set("openaiApiKey",e.target.value)} placeholder={form.hasOpenaiApiKey?"•••••••• 留空保留原值":"啟用 AI 後再填"} disabled={form.aiEnabled!=="true"}/></div>
-          <div className="field full actions"><button onClick={save}>{saved?"已儲存":"儲存全部設定"}</button><button className="smallButton" onClick={testAI} disabled={form.aiEnabled!=="true"}>測試 OpenAI 連線</button>{testResult&&<span className="note">{testResult}</span>}</div>
-        </div>
-      </div>
+      <Kpi label="本月淨收入" value={money(data.metrics.netCents)} hint={`退款 ${money(data.metrics.refundCents)}`}/><Kpi label="本月訂單" value={data.metrics.orderCount} hint="已記錄交易"/><Kpi label="待處理" value={data.metrics.openCases+data.metrics.openAlerts} hint={`${data.metrics.openCases} 客服 · ${data.metrics.openAlerts} 異常`}/><Kpi label="AI 本月用量" value={`$${data.metrics.aiSpendUsd.toFixed(2)}`} hint={`上限 $${Number(form.aiMonthlyBudgetUsd||0).toFixed(2)}`}/>
+      <div className="card span6"><h2>營運狀態</h2><Status label="Notion Webhook" ok={form.hasNotionWebhookSecret}/><Status label="AI 自動化" ok={form.aiEnabled==="true"}/><Status label="異常通知" ok={form.notificationsEnabled==="true"&&form.hasDiscordWebhookUrl}/></div>
+      <div className="card span6"><h2>產品</h2><div className="row"><div><strong>Contractor Operations OS</strong><div className="note">Notion Marketplace</div></div><span className="badge">US${form.defaultProductPriceUsd}</span></div><div className="row"><span>上架狀態</span><span className="badge">送審前</span></div></div>
     </section>
-  </main>;
+    <section id="commerce" className="grid sectionGap">
+      <div className="card span6"><h2>新增訂單</h2><div className="form one"><Field label="外部訂單編號（選填）"><input value={order.external_id} onChange={e=>setOrder({...order,external_id:e.target.value})}/></Field><Field label="買家名稱"><input value={order.buyer_name} onChange={e=>setOrder({...order,buyer_name:e.target.value})}/></Field><Field label="買家 Email"><input type="email" value={order.buyer_email} onChange={e=>setOrder({...order,buyer_email:e.target.value})}/></Field><Field label="金額（USD）"><input type="number" min="0" step="0.01" value={order.amount} onChange={e=>setOrder({...order,amount:e.target.value})}/></Field><Field label="狀態"><select value={order.status} onChange={e=>setOrder({...order,status:e.target.value})}><option value="paid">已付款</option><option value="completed">已完成</option><option value="pending">待確認</option></select></Field><button onClick={()=>addRecord("order",{...order,amount_cents:Math.round(Number(order.amount)*100),currency:"USD"},()=>setOrder({...order,external_id:"",buyer_name:"",buyer_email:""}))}>加入訂單</button></div></div>
+      <div className="card span6"><h2>新增退款</h2><div className="form one"><Field label="對應訂單"><select value={refund.order_id} onChange={e=>setRefund({...refund,order_id:e.target.value})}><option value="">未指定</option>{data.orders.map(x=><option key={x.id} value={x.id}>{x.external_id||`#${x.id}`} · {money(x.amount_cents)}</option>)}</select></Field><Field label="退款編號（選填）"><input value={refund.external_id} onChange={e=>setRefund({...refund,external_id:e.target.value})}/></Field><Field label="退款金額（USD）"><input type="number" min="0" step="0.01" value={refund.amount} onChange={e=>setRefund({...refund,amount:e.target.value})}/></Field><Field label="原因"><input value={refund.reason} onChange={e=>setRefund({...refund,reason:e.target.value})}/></Field><button onClick={()=>addRecord("refund",{...refund,amount_cents:Math.round(Number(refund.amount)*100)},()=>setRefund({...refund,external_id:"",reason:""}))}>加入退款</button></div></div>
+      <div className="card span12"><h2>最近訂單</h2><Table heads={["日期","訂單","買家","金額","狀態"]} rows={data.orders.map(x=>[date(x.purchased_at),x.external_id||`#${x.id}`,x.buyer_name||x.buyer_email||"—",money(x.amount_cents),x.status])}/></div>
+      <div className="card span12"><h2>退款記錄</h2><Table heads={["日期","退款","對應訂單","金額","原因"]} rows={data.refunds.map(x=>[date(x.refunded_at),x.external_id||`#${x.id}`,x.order_external_id||x.order_id||"—",money(x.amount_cents),x.reason||"—"])}/></div>
+    </section>
+    <section id="support" className="grid sectionGap"><div className="card span6"><h2>新增客服案件</h2><div className="form one"><Field label="主旨"><input value={support.subject} onChange={e=>setSupport({...support,subject:e.target.value})}/></Field><Field label="客戶 Email"><input type="email" value={support.customer_email} onChange={e=>setSupport({...support,customer_email:e.target.value})}/></Field><Field label="分類"><select value={support.category} onChange={e=>setSupport({...support,category:e.target.value})}><option value="general">一般</option><option value="access">存取</option><option value="duplicate">複製模板</option><option value="billing">付款／退款</option><option value="bug">錯誤</option></select></Field><Field label="優先度"><select value={support.priority} onChange={e=>setSupport({...support,priority:e.target.value})}><option value="normal">一般</option><option value="high">高</option><option value="urgent">緊急</option></select></Field><Field label="摘要"><textarea value={support.summary} onChange={e=>setSupport({...support,summary:e.target.value})}/></Field><button onClick={()=>addRecord("support",support,()=>setSupport({...support,subject:"",customer_email:"",summary:""}))}>加入案件</button></div></div><div className="card span6"><h2>AI 營運分析</h2><p className="note">只分析本後台已有資料；不會主動聯絡客戶或執行退款。</p><div className="buttonRow"><button onClick={()=>runAI("support")} disabled={form.aiEnabled!=="true"}>分析客服</button><button className="smallButton" onClick={()=>runAI("sales")} disabled={form.aiEnabled!=="true"}>分析銷售</button><button className="smallButton" onClick={()=>runAI("anomaly")} disabled={form.aiEnabled!=="true"}>檢查異常</button></div><div className="analysis">{analysis||"分析結果會顯示在這裡。"}</div></div><div className="card span12"><h2>客服案件</h2><Table heads={["日期","主旨","客戶","分類","優先度","狀態"]} rows={data.supportCases.map(x=>[date(x.created_at),x.subject,x.customer_email||"—",x.category,x.priority,x.status])}/></div></section>
+    <section id="automation" className="grid sectionGap"><div className="card span12"><h2>AI、預算與異常通知</h2><p className="note">總開關關閉時不會呼叫 API。硬停止會在達到月預算後拒絕新呼叫；成本依你填寫的每百萬 token 費率估算。</p><div className="form"><Field label="AI 總開關"><select value={form.aiEnabled} onChange={e=>set("aiEnabled",e.target.value)}><option value="false">關閉</option><option value="true">開啟</option></select></Field><Field label="模型"><input value={form.aiModel} onChange={e=>set("aiModel",e.target.value)} disabled={form.aiEnabled!=="true"}/></Field><Field label="每月預算（USD）"><input type="number" min="0" step="0.01" value={form.aiMonthlyBudgetUsd} onChange={e=>set("aiMonthlyBudgetUsd",e.target.value)}/></Field><Field label="超額策略"><select value={form.aiBudgetMode} onChange={e=>set("aiBudgetMode",e.target.value)}><option value="hard_stop">硬停止</option><option value="warn">只警告</option></select></Field><Field label="輸入成本 / 百萬 token"><input type="number" min="0" step="0.01" value={form.aiInputCostPerMillion} onChange={e=>set("aiInputCostPerMillion",e.target.value)}/></Field><Field label="輸出成本 / 百萬 token"><input type="number" min="0" step="0.01" value={form.aiOutputCostPerMillion} onChange={e=>set("aiOutputCostPerMillion",e.target.value)}/></Field><Toggle label="客服分析" k="aiCustomerSupport" value={form.aiCustomerSupport} set={set}/><Toggle label="銷售分析" k="aiSalesAnalysis" value={form.aiSalesAnalysis} set={set}/><Toggle label="異常判斷" k="aiAnomalyTriage" value={form.aiAnomalyTriage} set={set}/><Toggle label="Discord 異常通知" k="notificationsEnabled" value={form.notificationsEnabled} set={set}/><Field label={`OpenAI API Key ${form.hasOpenaiApiKey?"（已設定）":""}`} full><input type="password" value={form.openaiApiKey} onChange={e=>set("openaiApiKey",e.target.value)} placeholder={form.hasOpenaiApiKey?"留空保留原值":"在此貼上"}/></Field><Field label={`Discord Webhook URL ${form.hasDiscordWebhookUrl?"（已設定）":""}`} full><input type="password" value={form.discordWebhookUrl} onChange={e=>set("discordWebhookUrl",e.target.value)} placeholder={form.hasDiscordWebhookUrl?"留空保留原值":"選用"}/></Field><div className="field full buttonRow"><button onClick={save}>儲存自動化設定</button><button className="smallButton" onClick={()=>test("/api/ai/test")} disabled={form.aiEnabled!=="true"}>測試 AI</button><button className="smallButton" onClick={()=>test("/api/alerts/test")}>測試通知</button></div></div></div><div className="card span12"><h2>異常佇列</h2><Table heads={["日期","等級","類型","內容","狀態"]} rows={data.alerts.map(x=>[date(x.created_at),x.severity,x.type,x.title+(x.message?" — "+x.message:""),x.status])}/></div></section>
+    <section id="settings" className="grid sectionGap"><div className="card span12"><h2>一般與整合設定</h2><p className="note">業務設定均由本頁管理；敏感欄位在伺服器端加密，留空儲存會保留原值。</p><div className="form"><Field label="品牌名稱"><input value={form.siteName} onChange={e=>set("siteName",e.target.value)}/></Field><Field label="管理 Email"><input value={form.ownerEmail} onChange={e=>set("ownerEmail",e.target.value)}/></Field><Field label="商品售價（USD）"><input type="number" min="0" value={form.defaultProductPriceUsd} onChange={e=>set("defaultProductPriceUsd",e.target.value)}/></Field><Field label="主要幣別"><input value={form.currency} onChange={e=>set("currency",e.target.value)}/></Field><Field label="Notion Marketplace 商品網址" full><input value={form.notionStoreUrl} onChange={e=>set("notionStoreUrl",e.target.value)}/></Field><Field label="Notion Creator Profile 網址" full><input value={form.notionCreatorUrl} onChange={e=>set("notionCreatorUrl",e.target.value)}/></Field><Field label={`Notion Webhook Secret ${form.hasNotionWebhookSecret?"（已設定）":""}`} full><input type="password" value={form.notionWebhookSecret} onChange={e=>set("notionWebhookSecret",e.target.value)} placeholder={form.hasNotionWebhookSecret?"留空保留原值":"在此建立一個高強度秘密值"}/></Field><Field label="Webhook Endpoint" full><input readOnly value="https://fieldopsstudio95.zeabur.app/api/webhooks/notion"/></Field><Field label="時區"><input value={form.timezone} onChange={e=>set("timezone",e.target.value)}/></Field><Field label="退款率警戒值（%）"><input type="number" min="0" max="100" value={form.refundAlertPercent} onChange={e=>set("refundAlertPercent",e.target.value)}/></Field><Field label="備註" full><textarea value={form.notes} onChange={e=>set("notes",e.target.value)}/></Field><div className="field full"><button onClick={save}>儲存全部設定</button></div></div></div></section>
+  </main>
 }
+function Kpi({label,value,hint}){return <div className="card kpi"><div className="label">{label}</div><div className="value">{value}</div><div className="kpiHint">{hint}</div></div>}
+function Status({label,ok}){return <div className="row"><span>{label}</span><span className={`badge ${ok?"ok":""}`}>{ok?"已啟用":"未啟用"}</span></div>}
+function Field({label,full,children}){return <div className={`field ${full?"full":""}`}><label>{label}</label>{children}</div>}
+function Toggle({label,k,value,set}){return <Field label={label}><select value={value} onChange={e=>set(k,e.target.value)}><option value="true">開</option><option value="false">關</option></select></Field>}
+function Table({heads,rows}){return <div className="tableWrap"><table><thead><tr>{heads.map(x=><th key={x}>{x}</th>)}</tr></thead><tbody>{rows.length?rows.map((r,i)=><tr key={i}>{r.map((x,j)=><td key={j}>{x}</td>)}</tr>):<tr><td colSpan={heads.length} className="emptyCell">目前沒有資料</td></tr>}</tbody></table></div>}

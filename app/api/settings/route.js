@@ -2,7 +2,7 @@ import{NextResponse}from"next/server";
 import{getSettings,saveSettings}from"../../../lib/db";
 import{isAdminRequest}from"../../../lib/auth";
 
-const allowed=["siteName","ownerEmail","notionStoreUrl","notionCreatorUrl","notionWebhookSecret","openaiApiKey","discordWebhookUrl","timezone","currency","notes","aiEnabled","aiModel","aiMonthlyBudgetUsd","aiCustomerSupport","aiSalesAnalysis","aiFeedbackAnalysis","aiAnomalyTriage"];
+const allowed=["siteName","ownerEmail","notionStoreUrl","notionCreatorUrl","notionWebhookSecret","openaiApiKey","discordWebhookUrl","timezone","currency","notes","aiEnabled","aiModel","aiMonthlyBudgetUsd","aiBudgetMode","aiInputCostPerMillion","aiOutputCostPerMillion","aiCustomerSupport","aiSalesAnalysis","aiFeedbackAnalysis","aiAnomalyTriage","defaultProductPriceUsd","refundAlertPercent","notificationsEnabled"];
 
 export async function GET(req){
   if(!isAdminRequest(req))return NextResponse.json({error:"unauthorized"},{status:401});
